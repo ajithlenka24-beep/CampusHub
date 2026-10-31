@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CampusHub - Student Skill, Opportunity & Team Collaboration Platform. Showcase your skills, find internships, and build project teams.">
+    <meta name="theme-color" content="#ffffff">
+    <title>CampusHub | Student Skills, Opportunities & Teams</title>
+    <!-- CSS will be linked here later -->
+    <link rel="stylesheet" href="style1.css">
+</head>
+<body>
+
+    <!-- 1. TOP NAVIGATION BAR -->
+    <header class="site-header">
+        <div class="header-container">
+            <div class="brand">
+                <a href="/" aria-label="CampusHub Homepage">
+                    <span class="logo-text">CampusHub</span>
+                </a>
+            </div>
+            
+            <nav class="navbar" aria-label="Main Navigation">
+                <ul class="nav-links">
+                    <li><a href="#dashboard">Dashboard</a></li>
+                    <li><a href="#opportunities">Opportunities</a></li>
+                    <li><a href="#applications">My Applications</a></li>
+                    <li><a href="#group-up">Group Up</a></li>
+                    <li><a href="#profile">Profile</a></li>
+                </ul>
+            </nav>
+
+            <div class="user-controls">
+                <button class="icon-btn notification-btn" aria-label="Notifications">
+                    <img src="assets/icons/bell-placeholder.svg" alt="Notifications" class="notification-icon" width="24" height="24">
+                </button>
+                <a href="#profile" class="user-avatar-link" aria-label="View Profile">
+                    <img src="assets/images/avatar-placeholder.png" alt="User Profile Avatar" class="user-avatar" width="40" height="40">
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+
+        <!-- 2. HERO / WELCOME SECTION -->
+        <section class="hero" id="dashboard" aria-labelledby="hero-title">
+            <div class="hero-content">
+                <h1 id="hero-title">Build Your Skills. Discover Opportunities. Build Your Team.</h1>
+                <p class="hero-description">
+                    CampusHub helps students showcase their skills, discover relevant opportunities, track applications and build stronger project teams.
+                </p>
+                <div class="hero-actions">
+                    <a href="#opportunities" class="btn btn-primary">Explore Opportunities</a>
+                    <a href="#profile" class="btn btn-secondary">Complete Your Profile</a>
+                </div>
+            </div>
+            <div class="hero-illustration">
+                <img src="assets/images/student-illustration-placeholder.svg" alt="Illustration of a student working on a laptop surrounded by UI widgets" class="illustration-img" width="500" height="400">
+            </div>
+        </section>
+
+        <!-- 3. STUDENT OVERVIEW / QUICK STATS -->
+        <section class="dashboard-overview" aria-labelledby="overview-title">
+            <h2 id="overview-title" class="section-title sr-only">Dashboard Overview</h2>
+            
+            <div class="stats-grid">
+                <article class="stat-card">
+                    <h3 class="stat-title">Profile Completion</h3>
+                    <p class="stat-value">85%</p>
+                </article>
+                <article class="stat-card">
+                    <h3 class="stat-title">Skills</h3>
+                    <p class="stat-value">7</p>
+                </article>
+                <article class="stat-card">
+                    <h3 class="stat-title">Projects</h3>
+                    <p class="stat-value">4</p>
+                </article>
+                <article class="stat-card">
+                    <h3 class="stat-title">Applications</h3>
+                    <p class="stat-value">3</p>
+                </article>
+                <article class="stat-card">
+                    <h3 class="stat-title">Certifications</h3>
+                    <p class="stat-value">5</p>
+                </article>
+            </div>
+        </section>
+
+        <!-- 4. SKILL OVERVIEW -->
+        <section class="skills-section" aria-labelledby="skills-title">
+            <header class="section-header">
+                <h2 id="skills-title">My Skills</h2>
+            </header>
+            
+            <div class="skills-list">
+                <div class="skill-item">
+                    <div class="skill-info">
+                        <span class="skill-name">C++</span>
+                        <span class="skill-percentage">90%</span>
+                    </div>
+                    <progress class="skill-progress" value="90" max="100" aria-label="C++ proficiency 90%"></progress>
+                </div>
+                
+                <div class="skill-item">
+                    <div class="skill-info">
+                        <span class="skill-name">Python</span>
+                        <span class="skill-percentage">80%</span>
+                    </div>
+                    <progress class="skill-progress" value="80" max="100" aria-label="Python proficiency 80%"></progress>
+                </div>
+                
+                <div class="skill-item">
+                    <div class="skill-info">
+                        <span class="skill-name">JavaScript</span>
+                        <span class="skill-percentage">70%</span>
+                    </div>
+                    <progress class="skill-progress" value="70" max="100" aria-label="JavaScript proficiency 70%"></progress>
+                </div>
+
+                <div class="skill-item">
+                    <div class="skill-info">
+                        <span class="skill-name">SQL</span>
+                        <span class="skill-percentage">60%</span>
+                    </div>
+                    <progress class="skill-progress" value="60" max="100" aria-label="SQL proficiency 60%"></progress>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. RECOMMENDED OPPORTUNITIES -->
+        <section class="opportunities-section" id="opportunities" aria-labelledby="opportunities-title">
+            <header class="section-header">
+                <h2 id="opportunities-title">Recommended Opportunities</h2>
+            </header>
+
+            <div class="opportunities-grid">
+                <!-- Opportunity Card 1 -->
+                <article class="opportunity-card">
+                    <header class="opportunity-header">
+                        <h3 class="opportunity-title">C++ Developer Internship</h3>
+                        <p class="opportunity-org">Organization: TechNova</p>
+                    </header>
+                    <div class="opportunity-details">
+                        <p><strong>Type:</strong> Internship</p>
+                        <p><strong>Deadline:</strong> Nov 15, 2026</p>
+                        <p><strong>Required Skills:</strong> C++, DSA, OOP</p>
+                    </div>
+                    <div class="match-score-container">
+                        <p class="match-score" aria-label="Skill Match 92%">Match: 92%</p>
+                    </div>
+                    <footer class="opportunity-actions">
+                        <button class="btn btn-secondary">View Details</button>
+                        <button class="btn btn-primary">Apply</button>
+                    </footer>
+                </article>
+
+                <!-- Opportunity Card 2 -->
+                <article class="opportunity-card">
+                    <header class="opportunity-header">
+                        <h3 class="opportunity-title">AI/ML Hackathon</h3>
+                        <p class="opportunity-org">Organization: Campus AI Club</p>
+                    </header>
+                    <div class="opportunity-details">
+                        <p><strong>Type:</strong> Hackathon</p>
+                        <p><strong>Deadline:</strong> Nov 20, 2026</p>
+                        <p><strong>Required Skills:</strong> Python, ML, AI</p>
+                    </div>
+                    <div class="match-score-container">
+                        <p class="match-score" aria-label="Skill Match 84%">Match: 84%</p>
+                    </div>
+                    <footer class="opportunity-actions">
+                        <button class="btn btn-secondary">View Details</button>
+                        <button class="btn btn-primary">Apply</button>
+                    </footer>
+                </article>
+
+                <!-- Opportunity Card 3 -->
+                <article class="opportunity-card">
+                    <header class="opportunity-header">
+                        <h3 class="opportunity-title">Full Stack Web Workshop</h3>
+                        <p class="opportunity-org">Organization: Tech Community</p>
+                    </header>
+                    <div class="opportunity-details">
+                        <p><strong>Type:</strong> Workshop</p>
+                        <p><strong>Deadline:</strong> Dec 01, 2026</p>
+                        <p><strong>Required Skills:</strong> HTML, CSS, JavaScript</p>
+                    </div>
+                    <div class="match-score-container">
+                        <p class="match-score" aria-label="Skill Match 78%">Match: 78%</p>
+                    </div>
+                    <footer class="opportunity-actions">
+                        <button class="btn btn-secondary">View Details</button>
+                        <button class="btn btn-primary">Apply</button>
+                    </footer>
+                </article>
+            </div>
+        </section>
+
+        <!-- 6. SKILL MATCHING SECTION -->
+        <section class="skill-matching-section" aria-labelledby="matching-title">
+            <div class="matching-content">
+                <header class="section-header">
+                    <h2 id="matching-title">Find Opportunities That Match Your Skills</h2>
+                    <p class="matching-description">CampusHub compares your profile skills with the skills required by an opportunity and calculates a compatibility score.</p>
+                </header>
+
+                <div class="demo-match-card">
+                    <h3 class="demo-role">C++ Developer Internship</h3>
+                    
+                    <div class="demo-skills-comparison">
+                        <h4 class="comparison-subtitle">Your Skills vs Requirements:</h4>
+                        <ul class="comparison-list">
+                            <li class="match-success"><span aria-hidden="true">✓</span> C++</li>
+                            <li class="match-success"><span aria-hidden="true">✓</span> DSA</li>
+                            <li class="match-success"><span aria-hidden="true">✓</span> OOP</li>
+                            <li class="match-fail"><span aria-hidden="true">✗</span> Git</li>
+                        </ul>
+                    </div>
+
+                    <div class="demo-score-display">
+                        <h4 class="score-label">Match Score</h4>
+                        <div class="score-circle">
+                            <span class="score-value">75%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. APPLICATION TRACKER -->
+        <section class="application-tracker" id="applications" aria-labelledby="tracker-title">
+            <header class="section-header">
+                <h2 id="tracker-title">Application Tracker</h2>
+            </header>
+
+            <div class="tracker-list">
+                <article class="tracker-item status-applied">
+                    <div class="tracker-info">
+                        <h3 class="tracker-role">C++ Developer Internship</h3>
+                        <p class="tracker-org">TechNova</p>
+                    </div>
+                    <div class="tracker-status">
+                        <span class="status-badge">Status: Applied</span>
+                    </div>
+                </article>
+
+                <article class="tracker-item status-shortlisted">
+                    <div class="tracker-info">
+                        <h3 class="tracker-role">AI/ML Hackathon</h3>
+                        <p class="tracker-org">Campus AI Club</p>
+                    </div>
+                    <div class="tracker-status">
+                        <span class="status-badge">Status: Shortlisted</span>
+                    </div>
+                </article>
+
+                <article class="tracker-item status-interview">
+                    <div class="tracker-info">
+                        <h3 class="tracker-role">Web Development Internship</h3>
+                        <p class="tracker-org">CreativeTech</p>
+                    </div>
+                    <div class="tracker-status">
+                        <span class="status-badge">Status: Interview</span>
+                    </div>
+                </article>
+
+                <article class="tracker-item status-selected">
+                    <div class="tracker-info">
+                        <h3 class="tracker-role">Cloud Workshop</h3>
+                        <p class="tracker-org">CloudTech Community</p>
+                    </div>
+                    <div class="tracker-status">
+                        <span class="status-badge">Status: Selected</span>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- 8. STUDENT PROFILE OVERVIEW -->
+        <section class="profile-overview" id="profile" aria-labelledby="profile-title">
+            <header class="section-header">
+                <h2 id="profile-title">Student Profile Overview</h2>
+                <div class="profile-actions-top">
+                    <button class="btn btn-secondary">Edit Profile</button>
+                </div>
+            </header>
+
+            <div class="profile-card">
+                <div class="profile-header">
+                    <img src="assets/images/ajith-avatar-placeholder.png" alt="Ajith's Profile Picture" class="profile-image" width="100" height="100">
+                    <div class="profile-titles">
+                        <h3 class="profile-name">Ajith</h3>
+                        <p class="profile-course">Computer Science & Engineering</p>
+                        <p class="profile-semester">Semester: 3</p>
+                    </div>
+                </div>
+
+                <div class="profile-body">
+                    <section class="profile-section">
+                        <h4>Skills</h4>
+                        <p>C++, Python, DSA, SQL</p>
+                    </section>
+
+                    <section class="profile-section">
+                        <h4>Projects</h4>
+                        <ul class="bullet-list">
+                            <li>CampusHub</li>
+                            <li>Student Management System</li>
+                            <li>DSA Algorithm Visualizer</li>
+                        </ul>
+                    </section>
+
+                    <section class="profile-section">
+                        <h4>Achievements</h4>
+                        <ul class="bullet-list">
+                            <li>DSA Lab Achievement</li>
+                            <li>Hackathon Participant</li>
+                        </ul>
+                    </section>
+
+                    <section class="profile-section">
+                        <h4>Certifications</h4>
+                        <ul class="bullet-list">
+                            <li>Python Certification</li>
+                            <li>Database Fundamentals</li>
+                        </ul>
+                    </section>
+
+                    <section class="profile-section profile-links">
+                        <h4>Links</h4>
+                        <ul class="inline-list">
+                            <li><a href="#" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+                            <li><a href="#" target="_blank" rel="noopener noreferrer">LinkedIn</a></li>
+                        </ul>
+                    </section>
+                </div>
+
+                <footer class="profile-footer">
+                    <button class="btn btn-primary">View Full Profile</button>
+                </footer>
+            </div>
+        </section>
+
+        <!-- 9. GROUP UP PREVIEW -->
+        <section class="group-up" id="group-up" aria-labelledby="group-title">
+            <header class="section-header">
+                <h2 id="group-title">Group Up</h2>
+                <p class="group-description">Build stronger teams by combining the skills and strengths of your friends.</p>
+            </header>
+
+            <article class="team-preview-card">
+                <header class="team-header">
+                    <h3 class="team-name">Team Phoenix</h3>
+                </header>
+                
+                <div class="team-members">
+                    <h4 class="team-subtitle">Members:</h4>
+                    <ul class="member-list">
+                        <li><strong>Ajith</strong> &mdash; Backend / C++</li>
+                        <li><strong>Rahul</strong> &mdash; Frontend / React</li>
+                        <li><strong>Arjun</strong> &mdash; AI/ML</li>
+                        <li><strong>Sneha</strong> &mdash; UI/UX</li>
+                        <li><strong>Kiran</strong> &mdash; Database</li>
+                    </ul>
+                </div>
+
+                <div class="team-stats">
+                    <div class="team-stat">
+                        <span class="stat-label">Team Skill Coverage:</span>
+                        <span class="stat-value">91%</span>
+                    </div>
+                    <div class="team-stat">
+                        <span class="stat-label">Team Readiness:</span>
+                        <span class="stat-value">89%</span>
+                    </div>
+                </div>
+
+                <footer class="team-actions">
+                    <button class="btn btn-primary">Create a Group</button>
+                </footer>
+            </article>
+        </section>
+
+    </main>
+
+    <!-- 10. FOOTER -->
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <h2 class="footer-logo">CampusHub</h2>
+                <p class="footer-tagline">Student Skills &bull; Opportunities &bull; Teams</p>
+            </div>
+            
+            <nav class="footer-nav" aria-label="Footer Navigation">
+                <ul class="footer-links">
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                    <li><a href="#privacy">Privacy</a></li>
+                    <li><a href="#terms">Terms</a></li>
+                </ul>
+            </nav>
+
+            <div class="footer-social" aria-label="Social Media Links">
+                <ul class="social-links">
+                    <li><a href="#" aria-label="GitHub">GitHub</a></li>
+                    <li><a href="#" aria-label="LinkedIn">LinkedIn</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <p class="copyright">&copy; 2026 CampusHub. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Script will be linked here later -->
+    <!-- <script src="script.js"></script> -->
+    <script src="script.js"></script>
+</body>
+</html>

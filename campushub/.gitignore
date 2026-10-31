@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# secrets and local config
+.env
+.env.*
+!.env.example
+!.env.test.example
+
+# user uploads and test artefacts
+backend/uploads/
+backend/uploads-test/
+e2e/screenshots/

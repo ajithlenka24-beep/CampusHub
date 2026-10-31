@@ -1,0 +1,18 @@
+# Optional: run PostgreSQL in Docker instead of installing it.
+#   docker compose up -d
+# Creates the `campushub` database (and `campushub_test` for the automated tests).
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: campushub
+      POSTGRES_PASSWORD: campushub
+      POSTGRES_DB: campushub
+    ports:
+      - "5432:5432"
+    volumes:
+      - campushub-data:/var/lib/postgresql/data
+      - ./scripts/create-test-db.sql:/docker-entrypoint-initdb.d/create-test-db.sql:ro
+volumes:
+  campushub-data:

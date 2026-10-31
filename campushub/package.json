@@ -1,0 +1,35 @@
+{
+  "name": "campushub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CampusHub — student skill, opportunity and team collaboration platform",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c yellow,cyan \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "start": "npm run start -w backend",
+    "test": "npm run test -w backend",
+    "db:migrate": "npm run db:migrate -w backend",
+    "db:seed": "npm run db:seed -w backend",
+    "db:reset": "npm run db:reset -w backend",
+    "create-admin": "npm run create-admin -w backend --",
+    "db:generate": "npm run db:generate -w backend",
+    "db:studio": "npm run db:studio -w backend",
+    "setup": "npm install && npm run db:migrate && npm run db:seed",
+    "test:e2e": "node e2e/run-e2e.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.12"
+    }
+  }
+}

@@ -66,7 +66,11 @@ export function TagInput({
           placeholder={value.length >= max ? `Maximum ${max}` : placeholder}
           disabled={value.length >= max}
           onChange={(e) => setText(e.target.value)}
-          onBlur={() => setTimeout(() => setSuggestions([]), 150)}
+          onBlur={() => {
+            // keep what was typed even if the user clicks Save/Add without pressing Enter
+            if (text.trim()) add(text);
+            setTimeout(() => setSuggestions([]), 150);
+          }}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();

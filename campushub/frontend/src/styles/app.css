@@ -414,3 +414,15 @@ details.explain p { margin-top: 8px; font-size: 0.86rem; color: var(--text-secon
   .modal-footer .btn { flex: 1 1 auto; }
   .chat-panel { right: 8px; bottom: 8px; width: calc(100vw - 16px); height: calc(100vh - 16px); }
 }
+
+/* ---------------------------------------------------------- multi-step onboarding (6 steps) */
+.stepper.stepper-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.stepper-6 .step { flex-direction: column; justify-content: center; gap: 6px; padding: 10px 6px; text-align: center; font-size: 0.78rem; line-height: 1.2; }
+.step-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.step-head h2 { font-size: 1.25rem; }
+.mini-form { display: grid; gap: 14px; padding: 18px; border: 1px dashed var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-elevated); }
+.consent-box { display: grid; gap: 10px; padding: 16px 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: rgba(212, 175, 55, 0.04); }
+.empty-inline { padding: 14px 16px; border: 1px dashed var(--border-subtle); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.9rem; }
+@media (max-width: 767px) {
+  .stepper.stepper-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

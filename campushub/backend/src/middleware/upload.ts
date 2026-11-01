@@ -1,11 +1,47 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import type { NextFunction, Request, Response } from "express";
+import { and, eq } from "drizzle-orm";
 import multer from "multer";
 import { env } from "../config/env.js";
-import { badRequest } from "../utils/httpError.js";
+import { db } from "../db/client.js";
+import { projects } from "../db/schema.js";
+import { badRequest, notFound, unauthorized } from "../utils/httpError.js";
 
 export const uploadRoot = path.resolve(process.cwd(), env.UPLOAD_DIR);
+
+/** The only file names saveImage() ever creates: /<folder>/<uuid>.<ext> */
+const UPLOAD_PATH = /^\/(avatars|projects)\/[0-9a-f-]{36}\.(png|jpg|webp)$/;
+
+/**
+ * Uploaded images are served only to signed-in users (runs after loadUser).
+ * Profile pictures can be seen by any signed-in user (they appear on team cards);
+ * project screenshots only by the student who owns the project, and by administrators.
+ */
+export async function uploadAccess(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) return next(unauthorized("Please log in to view this image."));
+  let filePath: string;
+  try {
+    filePath = decodeURIComponent(req.path);
+  } catch {
+    return next(notFound());
+  }
+  const match = UPLOAD_PATH.exec(filePath);
+  if (!match) return next(notFound());
+  if (match[1] === "projects" && req.user.role !== "ADMIN") {
+    const [own] = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.imageUrl, `/uploads${filePath}`), eq(projects.userId, req.user.id)));
+    if (!own) return next(notFound());
+  }
+  // private: never stored by shared caches/proxies
+  res.setHeader("Cache-Control", "private, max-age=604800");
+  // helmet's default (same-origin) would block <img> tags when the frontend runs on another origin
+  res.setHeader("Cross-Origin-Resource-Policy", env.COOKIE_SAMESITE === "none" ? "cross-origin" : "same-site");
+  next();
+}
 
 /** Files are kept in memory first so their real type can be checked before saving. */
 export const imageUpload = multer({

@@ -181,6 +181,7 @@ export default function CareerPage() {
 
       <section className="card">
         <div className="card-head"><h2>Your best open matches</h2><Link className="link small" to="/opportunities">All opportunities →</Link></div>
+        {m.topMatches.length === 0 && <p className="faint">No open opportunities to compare with yet. New postings will show up here with your match.</p>}
         <div className="list">
           {m.topMatches.map((t) => (
             <Link key={t.id} to={`/opportunities/${t.id}`} className="list-item">

@@ -4,10 +4,13 @@ import { pool } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
 import { purgeExpiredSessions } from "./services/sessions.js";
 import { aiStatus } from "./services/ai/provider.js";
+import { ensureBootstrapAdmin, productionWarnings } from "./services/startup.js";
 
 async function main() {
   // Pending migrations are applied automatically, so a fresh database "just works".
-  await runMigrations();
+  if (env.AUTO_MIGRATE) await runMigrations();
+  await ensureBootstrapAdmin();
+  await productionWarnings();
   const app = createApp();
   const server = app.listen(env.PORT, () => {
     console.log(`\n  CampusHub API running on http://localhost:${env.PORT}`);

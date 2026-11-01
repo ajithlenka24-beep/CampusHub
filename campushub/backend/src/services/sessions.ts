@@ -9,6 +9,8 @@ import { addDays, addHours } from "../utils/dates.js";
 export const SESSION_COOKIE = "ch_session";
 export const CSRF_COOKIE = "ch_csrf";
 
+const cookieBase = () => ({ secure: env.COOKIE_SECURE, sameSite: env.COOKIE_SAMESITE, path: "/" }) as const;
+
 /**
  * Sessions are random tokens stored in an HTTP-only cookie. The database only
  * keeps a SHA-256 hash, so sessions can be revoked (logout, password reset)
@@ -21,9 +23,7 @@ export async function createSession(res: Response, userId: string, rememberMe: b
 
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: env.COOKIE_SECURE,
-    sameSite: "lax",
-    path: "/",
+    ...cookieBase(),
     // "Remember me" = persistent cookie; otherwise it disappears when the browser closes
     ...(rememberMe ? { expires: expiresAt } : {}),
   });
@@ -31,7 +31,7 @@ export async function createSession(res: Response, userId: string, rememberMe: b
 }
 
 export function clearSessionCookie(res: Response) {
-  res.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: env.COOKIE_SECURE, sameSite: "lax", path: "/" });
+  res.clearCookie(SESSION_COOKIE, { httpOnly: true, ...cookieBase() });
 }
 
 export async function destroySession(sessionId: string) {
@@ -46,9 +46,13 @@ export async function purgeExpiredSessions() {
   await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
 }
 
-/** CSRF "double-submit" token: readable by the frontend, echoed back in a header. */
+/**
+ * CSRF "double-submit" token: stored in a cookie and returned in the response body; the frontend
+ * echoes it back in the X-CSRF-Token header. Passing no `existing` value rotates the token
+ * (done on login and logout, so one person's token is never reused by the next).
+ */
 export function issueCsrfCookie(res: Response, existing?: string) {
   const token = existing && existing.length >= 32 ? existing : randomToken(24);
-  res.cookie(CSRF_COOKIE, token, { httpOnly: false, secure: env.COOKIE_SECURE, sameSite: "lax", path: "/" });
+  res.cookie(CSRF_COOKIE, token, { httpOnly: false, ...cookieBase() });
   return token;
 }

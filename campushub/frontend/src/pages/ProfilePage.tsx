@@ -2,11 +2,11 @@ import { useRef, useState, type FormEvent } from "react";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
 import { TagInput } from "../components/TagInput";
-import { Avatar, Button, ConfirmModal, ErrorAlert, Field, PageHead, PageLoading, PasswordInput, ProgressBar } from "../components/ui";
+import { Avatar, Button, ConfirmModal, EmptyState, ErrorAlert, Field, PageHead, PageLoading, PasswordInput, ProgressBar } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useApi } from "../hooks/useApi";
-import { ApiError, api, errorMessage } from "../services/api";
+import { ApiError, api, assetUrl, errorMessage } from "../services/api";
 import type { Achievement, Certification, Profile, Project, StudentSkill } from "../types";
 import { CATEGORY_LABELS, formatDate, toDateInput } from "../utils/format";
 
@@ -55,6 +55,7 @@ export default function ProfilePage() {
         </div>
         <div className="stack-lg">
           <CompletionCard data={data} />
+          <PrivacyCard data={data} reload={reload} />
           <LinksCard data={data} />
           <PasswordCard />
         </div>
@@ -188,6 +189,38 @@ function CompletionCard({ data }: { data: Profile }) {
   );
 }
 
+/** Who can see what: everything on this page is private except the opt-in teammate-search card. */
+function PrivacyCard({ data, reload }: { data: Profile; reload: () => Promise<void> }) {
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+  const on = data.profile.showInDirectory;
+  const toggle = async (next: boolean) => {
+    setSaving(true);
+    try {
+      await api.patch("/profile", { showInDirectory: next });
+      await reload();
+      toast(next ? "Other students can now find you in teammate search." : "You are hidden from teammate search.", "success");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <section className="card">
+      <div className="card-head"><h2><Icon name="lock" className="gold" /> Privacy</h2><span className={`pill ${on ? "pill-mint" : "pill-muted"}`}>{on ? "Discoverable" : "Private"}</span></div>
+      <label className="checkbox">
+        <input type="checkbox" checked={on} disabled={saving} onChange={(e) => toggle(e.target.checked)} />
+        <span>Show me in Group Up teammate search</span>
+      </label>
+      <p className="faint small" style={{ marginTop: 10 }}>
+        When on, students creating a team can see your name, course, college, semester, picture and skills. Your projects, achievements,
+        certifications, links, applications, career data and email are never shown to other students. Teammates you join see your name, course and skills.
+      </p>
+    </section>
+  );
+}
+
 function LinksCard({ data }: { data: Profile }) {
   const links = [["GitHub", data.profile.githubUrl], ["LinkedIn", data.profile.linkedinUrl], ["Portfolio", data.profile.portfolioUrl]] as const;
   return (
@@ -238,7 +271,10 @@ function SkillsSection({ skills, reload }: { skills: StudentSkill[]; reload: () 
         <Button className="btn-primary btn-sm" onClick={() => setEditing("new")}><Icon name="plus" /> Add skill</Button>
       </div>
       {skills.length === 0 ? (
-        <p className="faint">No skills yet.</p>
+        <EmptyState icon="target" title="No skills yet">
+          <p className="muted small">Skills power your opportunity matches and Group Up role.</p>
+          <Button className="btn-primary btn-sm" onClick={() => setEditing("new")}><Icon name="plus" /> Add a skill</Button>
+        </EmptyState>
       ) : (
         <div className="table-wrap">
           <table className="table">
@@ -343,11 +379,16 @@ function ProjectsSection({ projects, reload }: { projects: Project[]; reload: ()
         <h2>Projects <span className="faint small">({projects.length})</span></h2>
         <Button className="btn-primary btn-sm" onClick={() => setEditing("new")}><Icon name="plus" /> Add project</Button>
       </div>
-      {projects.length === 0 ? <p className="faint">Projects carry the most weight in your portfolio. Add your first one!</p> : (
+      {projects.length === 0 ? (
+        <EmptyState icon="briefcase" title="No projects yet">
+          <p className="muted small">Projects carry the most weight in your portfolio.</p>
+          <Button className="btn-primary btn-sm" onClick={() => setEditing("new")}><Icon name="plus" /> Add your first project</Button>
+        </EmptyState>
+      ) : (
         <div className="grid-2">
           {projects.map((p) => (
             <article key={p.id} className="project-card">
-              {p.imageUrl && <img src={p.imageUrl} alt={`${p.title} screenshot`} />}
+              {p.imageUrl && <img src={assetUrl(p.imageUrl) ?? undefined} alt={`${p.title} screenshot`} />}
               <div className="row-between">
                 <h3 style={{ fontSize: "1.05rem" }}>{p.title}</h3>
                 <div className="row" style={{ gap: 6 }}>
@@ -414,7 +455,11 @@ function AchievementsSection({ items, reload }: { items: Achievement[]; reload: 
         <h2>Achievements <span className="faint small">({items.length})</span></h2>
         <Button className="btn-secondary btn-sm" onClick={() => setEditing("new")}><Icon name="plus" /> Add</Button>
       </div>
-      {items.length === 0 ? <p className="faint">No achievements yet.</p> : (
+      {items.length === 0 ? (
+        <EmptyState icon="sparkles" title="No achievements yet">
+          <p className="muted small">Hackathons, contests, awards: add them here when you have one.</p>
+        </EmptyState>
+      ) : (
         <div className="list">
           {items.map((a) => (
             <div key={a.id} className="list-item">
@@ -449,7 +494,11 @@ function CertificationsSection({ items, reload }: { items: Certification[]; relo
         <h2>Certifications <span className="faint small">({items.length})</span></h2>
         <Button className="btn-secondary btn-sm" onClick={() => setEditing("new")}><Icon name="plus" /> Add</Button>
       </div>
-      {items.length === 0 ? <p className="faint">No certifications yet.</p> : (
+      {items.length === 0 ? (
+        <EmptyState icon="shield" title="No certifications yet">
+          <p className="muted small">Course certificates and credentials you add appear here.</p>
+        </EmptyState>
+      ) : (
         <div className="list">
           {items.map((c) => (
             <div key={c.id} className="list-item">

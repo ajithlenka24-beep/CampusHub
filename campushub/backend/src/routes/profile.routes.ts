@@ -1,14 +1,14 @@
 import { Router } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "../db/client.js";
+import { db, type DbOrTx } from "../db/client.js";
 import { achievements, certifications, projects, studentProfiles, studentSkills, users } from "../db/schema.js";
 import { currentUser, requireAuth, requireStudent } from "../middleware/auth.js";
 import { imageUpload, removeUpload, saveImage } from "../middleware/upload.js";
 import { parse } from "../middleware/validate.js";
 import { notifyNewStrongMatches, snapshotMatches } from "../services/alerts.js";
 import { logActivity } from "../services/activity.js";
-import { proficiencyLevel } from "../services/skillNormalizer.js";
+import { normalizeSkill, proficiencyLevel } from "../services/skillNormalizer.js";
 import { getOrCreateSkills } from "../services/skills.js";
 import { getProfileCompletion, getStudentSkills } from "../services/studentData.js";
 import { badRequest, conflict, notFound } from "../utils/httpError.js";
@@ -27,22 +27,50 @@ const personalSchema = z.object({
   portfolioUrl: optionalUrl("Portfolio link"),
 });
 
+/** Partial update: only the fields that are sent are changed (used by the onboarding steps and settings). */
+const profilePatchSchema = personalSchema.extend({ showInDirectory: z.boolean() }).partial();
+
 const skillSchema = z.object({
   name: text(1, 60, "Skill name"),
   proficiency,
   experienceMonths: z.coerce.number().int().min(0).max(240).optional().default(0),
 });
 
+/**
+ * Onboarding asks only for what CampusHub needs to work: college, course and semester
+ * (collected at registration) and at least one skill (used for opportunity matching and
+ * Group Up). Everything else is optional and can be added later from the profile page.
+ */
+export const MIN_ONBOARDING_SKILLS = 1;
+const skillListSchema = z.array(skillSchema).max(30, "You can add up to 30 skills.");
+
+/** One-step onboarding (kept for API clients and tests; the web app uses the step-by-step endpoints). */
 const onboardingSchema = z.object({
   college: text(2, 160, "College"),
   course: text(2, 120, "Course"),
   department: optionalText(120, "Department"),
   semester,
-  bio: text(30, 600, "Introduction"),
+  bio: optionalText(600, "Introduction"),
   githubUrl: optionalUrl("GitHub link"),
   linkedinUrl: optionalUrl("LinkedIn link"),
-  skills: z.array(skillSchema).min(3, "Add at least 3 skills.").max(30, "You can add up to 30 skills."),
+  portfolioUrl: optionalUrl("Portfolio link"),
+  showInDirectory: z.boolean().optional().default(false),
+  skills: skillListSchema.min(MIN_ONBOARDING_SKILLS, "Add at least one skill."),
 });
+
+function assertUniqueSkills(list: { name: string }[]) {
+  const names = list.map((s) => normalizeSkill(s.name));
+  if (new Set(names).size !== names.length) throw badRequest("Each skill can only be added once.");
+}
+
+/** Replaces the student's whole skill list (inside the caller's transaction). */
+async function replaceSkills(tx: DbOrTx, userId: string, list: z.infer<typeof skillListSchema>) {
+  const refs = await getOrCreateSkills(tx, list.map((s) => s.name));
+  await tx.delete(studentSkills).where(eq(studentSkills.userId, userId));
+  if (refs.length) {
+    await tx.insert(studentSkills).values(refs.map((ref, i) => ({ userId, skillId: ref.id, proficiency: list[i].proficiency, experienceMonths: list[i].experienceMonths })));
+  }
+}
 
 const projectSchema = z.object({
   title: text(2, 120, "Project title"),
@@ -121,35 +149,66 @@ export function profileRouter() {
     res.json(await loadFullProfile(me.id));
   });
 
-  /** Mandatory onboarding: academic details, introduction and at least 3 skills. */
+  /**
+   * Partial profile update. Only the fields present in the body are validated and saved,
+   * so each onboarding step (basic information, social links, visibility) saves on its own.
+   */
+  router.patch("/", async (req, res) => {
+    const me = currentUser(req);
+    const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
+    const keys = Object.keys(profilePatchSchema.shape).filter((k) => k in body) as (keyof typeof profilePatchSchema.shape)[];
+    if (!keys.length) throw badRequest("Nothing to update.");
+    const data = parse(profilePatchSchema.pick(Object.fromEntries(keys.map((k) => [k, true])) as Record<(typeof keys)[number], true>), body) as z.infer<typeof profilePatchSchema>;
+    const { fullName, ...profileFields } = data;
+    await db.transaction(async (tx) => {
+      if (fullName !== undefined) await tx.update(users).set({ fullName }).where(eq(users.id, me.id));
+      if (Object.keys(profileFields).length) await tx.update(studentProfiles).set(profileFields).where(eq(studentProfiles.userId, me.id));
+    });
+    res.json(await loadFullProfile(me.id));
+  });
+
+  /** One-step onboarding: academic details, optional introduction/links and at least one skill. */
   router.post("/onboarding", async (req, res) => {
     const me = currentUser(req);
-    const data = parse(onboardingSchema, req.body);
-    const names = data.skills.map((s) => s.name.toLowerCase());
-    if (new Set(names).size !== names.length) throw badRequest("Each skill can only be added once.");
+    const { skills: skillList, ...profileFields } = parse(onboardingSchema, req.body);
+    assertUniqueSkills(skillList);
 
     await db.transaction(async (tx) => {
-      await tx
-        .update(studentProfiles)
-        .set({
-          college: data.college,
-          course: data.course,
-          department: data.department,
-          semester: data.semester,
-          bio: data.bio,
-          githubUrl: data.githubUrl,
-          linkedinUrl: data.linkedinUrl,
-        })
-        .where(eq(studentProfiles.userId, me.id));
-      const refs = await getOrCreateSkills(tx, data.skills.map((s) => s.name));
-      await tx.delete(studentSkills).where(eq(studentSkills.userId, me.id));
-      await tx.insert(studentSkills).values(
-        refs.map((ref, i) => ({ userId: me.id, skillId: ref.id, proficiency: data.skills[i].proficiency, experienceMonths: data.skills[i].experienceMonths })),
-      );
+      await tx.update(studentProfiles).set(profileFields).where(eq(studentProfiles.userId, me.id));
+      await replaceSkills(tx, me.id, skillList);
       await tx.update(users).set({ onboardingCompleted: true }).where(eq(users.id, me.id));
     });
     await notifyNewStrongMatches(db, me.id, new Map());
     await logActivity(db, { actorId: me.id, action: "ONBOARDING_COMPLETED", entityType: "user", entityId: me.id });
+    res.json({ user: await publicUser(me.id) });
+  });
+
+  /**
+   * Last onboarding step: checks the required information is there, saves the
+   * teammate-search choice and unlocks the dashboard. Safe to call twice.
+   */
+  router.post("/onboarding/complete", async (req, res) => {
+    const me = currentUser(req);
+    const { showInDirectory } = parse(z.object({ showInDirectory: z.boolean().optional() }), req.body ?? {});
+    const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.userId, me.id));
+    const skillCount = (await getStudentSkills(db, me.id)).length;
+    const missing = [
+      !profile?.college.trim() && { path: "college", message: "Add your college." },
+      !profile?.course.trim() && { path: "course", message: "Add your course." },
+      !profile?.semester && { path: "semester", message: "Choose your semester." },
+      skillCount < MIN_ONBOARDING_SKILLS && { path: "skills", message: "Add at least one skill." },
+    ].filter(Boolean) as { path: string; message: string }[];
+    if (missing.length) throw badRequest("A few required details are missing.", missing);
+
+    const firstTime = !me.onboardingCompleted;
+    await db.transaction(async (tx) => {
+      if (showInDirectory !== undefined) await tx.update(studentProfiles).set({ showInDirectory }).where(eq(studentProfiles.userId, me.id));
+      await tx.update(users).set({ onboardingCompleted: true }).where(eq(users.id, me.id));
+    });
+    if (firstTime) {
+      await notifyNewStrongMatches(db, me.id, new Map());
+      await logActivity(db, { actorId: me.id, action: "ONBOARDING_COMPLETED", entityType: "user", entityId: me.id });
+    }
     res.json({ user: await publicUser(me.id) });
   });
 
@@ -174,6 +233,19 @@ export function profileRouter() {
   /* ---------------- skills (changing skills re-runs matching and may trigger "new match" alerts) */
   router.get("/skills", async (req, res) => {
     const rows = await getStudentSkills(db, currentUser(req).id);
+    res.json({ skills: rows.map((s) => ({ ...s, level: proficiencyLevel(s.proficiency) })) });
+  });
+
+  /** Replaces the whole skill list at once (the onboarding "Skills" step). */
+  router.put("/skills", async (req, res) => {
+    const me = currentUser(req);
+    const { skills: list } = parse(z.object({ skills: skillListSchema }), req.body);
+    assertUniqueSkills(list);
+    const before = await snapshotMatches(db, me.id);
+    await db.transaction((tx) => replaceSkills(tx, me.id, list));
+    // during onboarding the match alerts are sent once, when the student finishes
+    if (me.onboardingCompleted) await notifyNewStrongMatches(db, me.id, before);
+    const rows = await getStudentSkills(db, me.id);
     res.json({ skills: rows.map((s) => ({ ...s, level: proficiencyLevel(s.proficiency) })) });
   });
 

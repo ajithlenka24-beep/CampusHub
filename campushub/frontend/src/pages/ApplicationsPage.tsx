@@ -33,8 +33,13 @@ export default function ApplicationsPage() {
         ))}
       </div>
 
-      {shown.length === 0 ? (
-        <EmptyState icon="clipboard" title="No applications here yet"><Link className="btn btn-primary btn-sm" to="/opportunities">Browse opportunities</Link></EmptyState>
+      {apps.length === 0 ? (
+        <EmptyState icon="clipboard" title="No applications yet">
+          <p className="muted small">When you apply to an internship, hackathon or event, you can follow every status change here.</p>
+          <Link className="btn btn-primary btn-sm" to="/opportunities">Explore opportunities</Link>
+        </EmptyState>
+      ) : shown.length === 0 ? (
+        <EmptyState icon="clipboard" title="No applications with this status"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setFilter("ALL")}>Show all applications</button></EmptyState>
       ) : (
         <div className="tracker-list">
           {shown.map((a) => (

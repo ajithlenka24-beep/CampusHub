@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import bcrypt from "bcryptjs";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -13,6 +13,7 @@ import { notify } from "../services/notifications.js";
 import { CSRF_COOKIE, clearSessionCookie, createSession, destroyAllSessions, destroySession, issueCsrfCookie } from "../services/sessions.js";
 import { randomToken, sha256 } from "../utils/crypto.js";
 import { addHours } from "../utils/dates.js";
+import type { RateLimiters } from "../middleware/rateLimit.js";
 import { HttpError, badRequest, conflict } from "../utils/httpError.js";
 import { email, password, semester, text } from "../validators/common.js";
 
@@ -74,8 +75,11 @@ async function sendVerificationEmail(userId: string, to: string, name: string) {
   await sendMail(to, "Verify your CampusHub email", `Hi ${name},\n\nWelcome to CampusHub! Confirm your email address by opening this link (valid for 24 hours):\n${link}\n\nIf you did not create an account, you can ignore this email.`);
 }
 
-export function authRouter(limiter: import("express").RequestHandler) {
+export function authRouter(limiters: Pick<RateLimiters, "authPerIp" | "authPerAccount">) {
   const router = Router();
+  // per-network cap, then per-account cap (see middleware/rateLimit.ts)
+  const limiter: RequestHandler = (req, res, next) =>
+    limiters.authPerIp(req, res, (error?: unknown) => (error ? next(error) : limiters.authPerAccount(req, res, next)));
 
   /** Issues the CSRF cookie. The frontend calls this once when it loads. */
   router.get("/csrf", (req, res) => {
@@ -138,19 +142,24 @@ export function authRouter(limiter: import("express").RequestHandler) {
       throw new HttpError(403, "Please verify your email address before logging in.", "EMAIL_NOT_VERIFIED");
     }
 
-    // a fresh session on every login (prevents session fixation)
+    // If this browser was still signed in (e.g. someone else's account on a shared computer),
+    // that session ends now instead of lingering in the database.
+    if (req.user) await destroySession(req.user.sessionId);
+    // a fresh session on every login (prevents session fixation) and a fresh CSRF token
     await createSession(res, user.id, rememberMe, req.get("user-agent") ?? "");
-    issueCsrfCookie(res);
+    const csrfToken = issueCsrfCookie(res);
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
     await logActivity(db, { actorId: user.id, action: "USER_LOGGED_IN", entityType: "user", entityId: user.id });
 
-    res.json({ user: await publicUser(user.id) });
+    res.json({ user: await publicUser(user.id), csrfToken });
   });
 
   router.post("/logout", async (req, res) => {
     if (req.user) await destroySession(req.user.sessionId);
     clearSessionCookie(res);
-    res.json({ message: "You have been logged out." });
+    // the next person using this browser gets a new CSRF token
+    const csrfToken = issueCsrfCookie(res);
+    res.json({ message: "You have been logged out.", csrfToken });
   });
 
   /** Current session for the frontend's startup check: 200 with user (or null) instead of a 401. */

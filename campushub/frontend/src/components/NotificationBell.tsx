@@ -89,7 +89,8 @@ export function NotificationBell() {
             </button>
           </div>
           <div className="notif-list">
-            {items.length === 0 && <p className="faint small" style={{ padding: 24, textAlign: "center" }}>You're all caught up.</p>}
+            {items.length === 0 && <p className="faint small notif-caught-up" style={{ padding: 24, textAlign: "center" }}>You're all caught up.</p>}
+            {items.length > 0 && unread === 0 && <p className="faint small notif-caught-up" style={{ padding: "12px 16px 4px" }}>You're all caught up. Earlier notifications:</p>}
             {items.map((n) => (
               <button key={n.id} type="button" className={`notif-item ${n.read ? "" : "unread"}`} onClick={() => openItem(n)}>
                 <span className="t">{n.title}</span>

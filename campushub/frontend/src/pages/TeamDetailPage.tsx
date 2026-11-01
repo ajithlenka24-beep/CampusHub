@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { Avatar, Button, ConfirmModal, PageLoading } from "../components/ui";
@@ -26,6 +26,8 @@ export default function TeamDetailPage() {
   const [search, setSearch] = useState("");
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [inviting, setInviting] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const loadCandidates = async (q = search) => {
     if (!data?.isOwner) return;
@@ -62,6 +64,39 @@ export default function TeamDetailPage() {
       setInviting(null);
     }
   };
+
+  /** Invite any classmate who has a CampusHub account, by their email address. */
+  const inviteByEmail = async (e: FormEvent) => {
+    e.preventDefault();
+    const address = inviteEmail.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) return setEmailError("Enter your classmate's email address.");
+    setEmailError(null);
+    setInviting("email");
+    try {
+      const res = await api.post<{ invitation: { inviteeName: string } }>(`/teams/${team.id}/invitations`, { email: address, message: `Join ${team.name} to work on ${team.projectTitle}!` });
+      toast(`Invitation sent to ${res.invitation.inviteeName}.`, "success");
+      setInviteEmail("");
+      await reload();
+      await loadCandidates();
+    } catch (err) {
+      setEmailError(errorMessage(err));
+    } finally {
+      setInviting(null);
+    }
+  };
+
+  // every skill the members really have (read live from their profiles), with who has it
+  const teamSkills = Object.values(
+    team.members.reduce<Record<string, { name: string; owners: string[]; best: number }>>((acc, m) => {
+      for (const s of m.skills) {
+        const key = s.name.toLowerCase();
+        acc[key] ??= { name: s.name, owners: [], best: 0 };
+        acc[key].owners.push(m.fullName);
+        acc[key].best = Math.max(acc[key].best, s.proficiency);
+      }
+      return acc;
+    }, {}),
+  ).sort((x, y) => y.owners.length - x.owners.length || y.best - x.best || x.name.localeCompare(y.name));
 
   const doConfirm = async () => {
     try {
@@ -197,12 +232,40 @@ export default function TeamDetailPage() {
         </section>
       </div>
 
+      <section className="card">
+        <div className="card-head">
+          <h2>Team skills</h2>
+          <span className="faint small">{teamSkills.length} skill{teamSkills.length === 1 ? "" : "s"} across {team.members.length} member{team.members.length === 1 ? "" : "s"}</span>
+        </div>
+        {teamSkills.length === 0 ? (
+          <p className="faint">No skills listed yet. Members add skills on their own profile pages.</p>
+        ) : (
+          <div className="chip-list">
+            {teamSkills.map((s) => (
+              <span key={s.name} className={`chip ${s.owners.length > 1 ? "chip-mint" : ""}`} title={`${s.owners.join(", ")} · best ${s.best}%`}>
+                {s.name} <span className="faint small">· {s.owners.length > 1 ? `${s.owners.length} members` : s.owners[0]}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="faint small" style={{ marginTop: 12 }}>Taken live from each member's own profile, so the analysis updates when a teammate adds or improves a skill.</p>
+      </section>
+
       {isOwner && (
         <section className="card">
           <div className="card-head">
             <h2>Find teammates</h2>
             <span className="faint small">{seatsLeft > 0 ? `${seatsLeft} seat${seatsLeft === 1 ? "" : "s"} available` : "Team is full"}</span>
           </div>
+          <form className="stack" style={{ gap: 8, marginBottom: 22 }} onSubmit={inviteByEmail} noValidate>
+            <label className="label" htmlFor="invite-email">Invite a classmate by email</label>
+            <div className="row">
+              <input id="invite-email" className="input" style={{ flex: 1, minWidth: 220 }} type="email" autoComplete="off" placeholder="classmate@college.edu" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} aria-invalid={Boolean(emailError)} />
+              <Button type="submit" disabled={seatsLeft <= 0} loading={inviting === "email"}><Icon name="send" /> Send invitation</Button>
+            </div>
+            {emailError ? <span className="field-error" role="alert">{emailError}</span> : <span className="hint">They need a CampusHub student account. They'll see the invitation under Group Up and in their notifications.</span>}
+          </form>
+          <div className="card-title-gold" style={{ marginBottom: 10 }}>Suggested students</div>
           <form className="row" style={{ marginBottom: 18 }} onSubmit={(e) => { e.preventDefault(); void loadCandidates(); }}>
             <div className="search-input" style={{ flex: 1, minWidth: 220 }}>
               <Icon name="search" />
@@ -211,7 +274,9 @@ export default function TeamDetailPage() {
             <Button type="submit" className="btn-secondary">Search</Button>
           </form>
           <p className="faint small" style={{ marginBottom: 14 }}>Ranked by how many of your missing required skills and empty roles each student would fill.</p>
-          {candidates === null ? <PageLoading /> : candidates.length === 0 ? <p className="faint">No students found.</p> : (
+          {candidates === null ? <PageLoading /> : candidates.length === 0 ? (
+            <p className="faint">No students to suggest. Only students who turn on "Show me in teammate search" appear here. You can always invite a classmate by email above.</p>
+          ) : (
             <div className="list">
               {candidates.map((c) => (
                 <div key={c.id} className="list-item">

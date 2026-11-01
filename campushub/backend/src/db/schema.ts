@@ -154,6 +154,9 @@ export const studentProfiles = pgTable("student_profiles", {
   githubUrl: varchar("github_url", { length: 255 }),
   linkedinUrl: varchar("linkedin_url", { length: 255 }),
   portfolioUrl: varchar("portfolio_url", { length: 255 }),
+  // Opt-in: list this student in Group Up teammate search (name, course, college and skills only).
+  // Off by default so a new account shares nothing until the student chooses to.
+  showInDirectory: boolean("show_in_directory").notNull().default(false),
   ...timestamps,
 });
 

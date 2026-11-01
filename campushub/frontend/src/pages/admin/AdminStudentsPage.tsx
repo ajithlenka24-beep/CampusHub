@@ -37,6 +37,7 @@ export default function AdminStudentsPage() {
           <table className="table">
             <thead><tr><th>Student</th><th className="table-hide-sm">College / course</th><th className="table-hide-sm">Joined</th><th className="table-hide-sm">Last login</th><th>Status</th><th /></tr></thead>
             <tbody>
+              {data?.students.length === 0 && <tr><td colSpan={6} className="faint">{q ? "No students match this search." : "No students have registered yet."}</td></tr>}
               {data?.students.map((s) => (
                 <tr key={s.id}>
                   <td><strong>{s.fullName}</strong><div className="faint small">{s.email}</div></td>

@@ -61,7 +61,11 @@ export default function OpportunitiesPage() {
 
       {error && <div className="alert alert-error">{error}</div>}
       {loading && !data ? <PageLoading /> : data && data.opportunities.length === 0 ? (
-        <EmptyState icon="search" title="No opportunities match these filters">Try clearing a filter or searching for something else.</EmptyState>
+        query === "" || query === "sort=match" ? (
+          <EmptyState icon="briefcase" title="No open opportunities yet">Internships, hackathons and events posted by your placement cell will appear here, ranked by your skill match.</EmptyState>
+        ) : (
+          <EmptyState icon="search" title="No opportunities match these filters">Try clearing a filter or searching for something else.</EmptyState>
+        )
       ) : (
         <>
           <p className="faint small" style={{ marginBottom: 14 }}>{data?.total ?? 0} result{data?.total === 1 ? "" : "s"}</p>

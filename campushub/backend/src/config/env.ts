@@ -16,14 +16,26 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 
-  // Public URL of the frontend (used in emails and for CORS)
-  APP_URL: z.string().url().default("http://localhost:5173"),
+  // Public URL of the frontend (used in emails and for CORS). On Render, the service's own
+  // URL (RENDER_EXTERNAL_URL) is used when APP_URL is not set.
+  APP_URL: z.string().url().default(process.env.RENDER_EXTERNAL_URL || "http://localhost:5173"),
   CORS_ORIGINS: z.string().default("http://localhost:5173"),
 
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(12),
   REMEMBER_ME_TTL_DAYS: z.coerce.number().int().positive().default(30),
   COOKIE_SECURE: bool(false),
+  // "lax" for a single-origin deployment (recommended). "none" only when the frontend is on a
+  // different site than the API; it requires COOKIE_SECURE=true (HTTPS).
+  COOKIE_SAMESITE: z.enum(["lax", "strict", "none"]).default("lax"),
   TRUST_PROXY: bool(false),
+  // Apply pending database migrations when the server starts (turn off if you run `npm run db:migrate` yourself)
+  AUTO_MIGRATE: bool(true),
+
+  // Optional first administrator, created at startup if no account uses this email yet
+  // (handy on hosts without a shell). Existing accounts are never modified or promoted.
+  ADMIN_EMAIL: z.string().trim().toLowerCase().default(""),
+  ADMIN_PASSWORD: z.string().default(""),
+  ADMIN_NAME: z.string().trim().default("CampusHub Admin"),
 
   EMAIL_VERIFICATION_REQUIRED: bool(false),
   ALLOWED_EMAIL_DOMAINS: z.string().default(""),
@@ -62,8 +74,16 @@ if (!parsed.success) {
 
 const raw = parsed.data;
 
-if (raw.NODE_ENV === "production" && !raw.COOKIE_SECURE) {
-  console.warn("[CampusHub] COOKIE_SECURE is false in production. Enable it when serving over HTTPS.");
+if (raw.COOKIE_SAMESITE === "none" && !raw.COOKIE_SECURE) {
+  // browsers silently drop SameSite=None cookies that are not Secure, so nobody could log in
+  console.error("\n[CampusHub] COOKIE_SAMESITE=none requires COOKIE_SECURE=true (the site must be served over HTTPS).\n");
+  process.exit(1);
+}
+
+if (raw.NODE_ENV === "production") {
+  if (!raw.COOKIE_SECURE) console.warn("[CampusHub] COOKIE_SECURE is false in production. Enable it when serving over HTTPS.");
+  if (!raw.TRUST_PROXY) console.warn("[CampusHub] TRUST_PROXY is false. Set it to true behind a reverse proxy or load balancer (Render, Railway, Nginx…) so rate limits see real client IPs.");
+  if (/localhost|127\.0\.0\.1/.test(raw.APP_URL)) console.warn("[CampusHub] APP_URL still points at localhost. Set it to your public URL so email links work.");
 }
 
 export const env = {

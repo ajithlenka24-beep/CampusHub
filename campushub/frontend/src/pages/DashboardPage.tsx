@@ -87,7 +87,7 @@ export default function DashboardPage() {
               <Link className="link small" to="/applications">Open tracker →</Link>
             </div>
             {data.recentApplications.length === 0 ? (
-              <EmptyState icon="clipboard" title="No applications yet"><Link className="btn btn-primary btn-sm" to="/opportunities">Find opportunities</Link></EmptyState>
+              <EmptyState icon="clipboard" title="No applications yet"><Link className="btn btn-primary btn-sm" to="/opportunities">Explore opportunities</Link></EmptyState>
             ) : (
               <div className="list">
                 {data.recentApplications.map((a) => (
@@ -108,6 +108,9 @@ export default function DashboardPage() {
               <h2>Skill development</h2>
               <Link className="link small" to="/profile">Manage skills →</Link>
             </div>
+            {data.skills.length === 0 && (
+              <EmptyState icon="target" title="No skills yet"><Link className="btn btn-primary btn-sm" to="/profile">Add your skills</Link></EmptyState>
+            )}
             <div className="grid-2">
               {data.skills.slice().sort((a, b) => b.proficiency - a.proficiency).slice(0, 8).map((s) => (
                 <div key={s.name} className="stack" style={{ gap: 8 }}>

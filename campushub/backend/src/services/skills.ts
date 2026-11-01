@@ -1,6 +1,6 @@
-import { asc, ilike, inArray } from "drizzle-orm";
+import { and, asc, ilike, inArray, or, sql } from "drizzle-orm";
 import type { DbOrTx } from "../db/client.js";
-import { skills } from "../db/schema.js";
+import { opportunitySkills, skills, studentSkills, teamMembers, teamRequiredSkills } from "../db/schema.js";
 import { badRequest } from "../utils/httpError.js";
 import { displaySkillName, guessCategory, normalizeSkill } from "./skillNormalizer.js";
 import type { SkillRef } from "./engines.js";
@@ -35,12 +35,27 @@ export async function getOrCreateSkills(dbx: DbOrTx, names: string[]): Promise<S
   return [...wanted.keys()].map((key) => byKey.get(key)!).filter(Boolean);
 }
 
-export async function searchSkillCatalog(dbx: DbOrTx, query: string, limit = 20) {
+/**
+ * Autocomplete suggestions. Skill names are free text typed by students, so a name only one
+ * other person ever typed is not suggested (it could reveal something about them). A skill is
+ * suggested when an opportunity or one of the viewer's teams requires it, when the viewer has
+ * it, or when at least two students list it.
+ */
+export async function searchSkillCatalog(dbx: DbOrTx, query: string, limit = 20, viewerId?: string) {
   const q = query.trim();
+  const shared = or(
+    sql`exists (select 1 from ${opportunitySkills} where ${opportunitySkills.skillId} = ${skills.id})`,
+    sql`(select count(*) from ${studentSkills} where ${studentSkills.skillId} = ${skills.id}) >= 2`,
+    viewerId ? sql`exists (select 1 from ${studentSkills} where ${studentSkills.skillId} = ${skills.id} and ${studentSkills.userId} = ${viewerId})` : undefined,
+    viewerId
+      ? sql`exists (select 1 from ${teamRequiredSkills} join ${teamMembers} on ${teamMembers.teamId} = ${teamRequiredSkills.teamId}
+               where ${teamRequiredSkills.skillId} = ${skills.id} and ${teamMembers.userId} = ${viewerId})`
+      : undefined,
+  );
   return dbx
     .select({ id: skills.id, name: skills.name, category: skills.category })
     .from(skills)
-    .where(q ? ilike(skills.name, `%${q.replace(/[%_]/g, "")}%`) : undefined)
+    .where(and(q ? ilike(skills.name, `%${q.replace(/[%_\\]/g, "")}%`) : undefined, shared))
     .orderBy(asc(skills.name))
     .limit(limit);
 }

@@ -22,11 +22,16 @@ export const email = z
   .toLowerCase()
   .pipe(z.email({ error: "Enter a valid email address." }));
 
-/** bcrypt only uses the first 72 bytes, so longer passwords are rejected. */
+/**
+ * bcrypt only uses the first 72 BYTES, so longer passwords are rejected (otherwise two
+ * passwords sharing the first 72 bytes would both work). Accented letters and emoji take
+ * 2–4 bytes each, hence the byte check in addition to the character limit.
+ */
 export const password = z
   .string({ error: "Password is required." })
   .min(8, "Password must be at least 8 characters.")
   .max(72, "Password must be at most 72 characters.")
+  .refine((value) => Buffer.byteLength(value, "utf8") <= 72, "Password is too long. Use at most 72 bytes (fewer if it has emoji or accented letters).")
   .regex(/[a-z]/, "Password must contain a lowercase letter.")
   .regex(/[A-Z]/, "Password must contain an uppercase letter.")
   .regex(/[0-9]/, "Password must contain a number.");

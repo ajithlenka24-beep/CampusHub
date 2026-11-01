@@ -8,11 +8,17 @@ import { analyseTeam } from "./engines.js";
 import { normalizeSkill, proficiencyLevel, recommendRoleArea, roleLabel } from "./skillNormalizer.js";
 
 /**
- * Public student cards for finding teammates. Only professional details are
- * shared (no email, applications, notifications or career data).
+ * Student cards for finding teammates and showing team members. Only professional
+ * details are included (no email, bio, links, projects, applications, notifications
+ * or career data).
+ *
+ * By default only students who opted in to teammate search are returned. Pass
+ * `discoverableOnly: false` only where the viewer already has a reason to see the
+ * card (members of the same team).
  */
-export async function loadStudentCards(filter: { excludeUserId?: string; q?: string; skill?: string; ids?: string[]; limit?: number }) {
+export async function loadStudentCards(filter: { excludeUserId?: string; q?: string; skill?: string; ids?: string[]; limit?: number; discoverableOnly?: boolean }) {
   const conditions = [eq(users.role, "STUDENT"), eq(users.isActive, true), eq(users.onboardingCompleted, true)];
+  if (filter.discoverableOnly ?? true) conditions.push(eq(studentProfiles.showInDirectory, true));
   if (filter.excludeUserId) conditions.push(ne(users.id, filter.excludeUserId));
   if (filter.ids) conditions.push(filter.ids.length ? inArray(users.id, filter.ids) : eq(users.id, "00000000-0000-0000-0000-000000000000"));
   if (filter.q) {
@@ -57,6 +63,19 @@ export async function loadStudentCards(filter: { excludeUserId?: string; q?: str
   return cards;
 }
 
+/**
+ * A student who can receive a team invitation: an active, onboarded student account
+ * (never an administrator). Looked up by id (from teammate suggestions) or by email.
+ */
+export async function findInvitee(dbx: DbOrTx, by: { id: string } | { email: string }) {
+  const [row] = await dbx
+    .select({ id: users.id, fullName: users.fullName, showInDirectory: studentProfiles.showInDirectory })
+    .from(users)
+    .innerJoin(studentProfiles, eq(studentProfiles.userId, users.id))
+    .where(and("id" in by ? eq(users.id, by.id) : eq(users.email, by.email), eq(users.role, "STUDENT"), eq(users.isActive, true), eq(users.onboardingCompleted, true)));
+  return row ?? null;
+}
+
 /** Loads a team with members (and their skills), required skills and the compatibility analysis. */
 export async function loadTeam(dbx: DbOrTx, teamId: string) {
   const [team] = await dbx.select().from(teams).where(eq(teams.id, teamId));
@@ -76,8 +95,9 @@ export async function loadTeam(dbx: DbOrTx, teamId: string) {
       .orderBy(asc(skills.name)),
   ]);
 
+  // members' real, current skills (read live from their profiles, never copied into the team)
   const ids = memberRows.map((m) => m.userId);
-  const cards = ids.length ? await loadStudentCards({ ids, limit: 50 }) : [];
+  const cards = ids.length ? await loadStudentCards({ ids, limit: 50, discoverableOnly: false }) : [];
   const members = memberRows.map((m) => {
     const card = cards.find((c) => c.id === m.userId);
     return {

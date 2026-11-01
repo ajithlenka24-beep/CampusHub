@@ -74,7 +74,7 @@ export interface Certification { id: string; name: string; issuer: string; issue
 
 export interface Profile {
   account: { id: string; email: string; fullName: string; emailVerified: boolean; createdAt: string };
-  profile: { college: string; course: string; department: string; semester: number | null; bio: string; avatarUrl: string | null; githubUrl: string | null; linkedinUrl: string | null; portfolioUrl: string | null };
+  profile: { college: string; course: string; department: string; semester: number | null; bio: string; avatarUrl: string | null; githubUrl: string | null; linkedinUrl: string | null; portfolioUrl: string | null; showInDirectory: boolean };
   skills: StudentSkill[];
   projects: Project[];
   achievements: Achievement[];

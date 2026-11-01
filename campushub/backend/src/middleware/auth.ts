@@ -4,7 +4,7 @@ import { db } from "../db/client.js";
 import { sessions, users, type UserRole } from "../db/schema.js";
 import { SESSION_COOKIE, clearSessionCookie, destroySession } from "../services/sessions.js";
 import { sha256 } from "../utils/crypto.js";
-import { forbidden, unauthorized } from "../utils/httpError.js";
+import { HttpError, forbidden, unauthorized } from "../utils/httpError.js";
 
 /** Reads the session cookie (if any) and attaches the logged-in user to req.user. */
 export async function loadUser(req: Request, res: Response, next: NextFunction) {
@@ -47,6 +47,22 @@ export async function loadUser(req: Request, res: Response, next: NextFunction) 
     emailVerified: Boolean(row.emailVerifiedAt),
     sessionId,
   };
+  next();
+}
+
+/** Header the frontend sends with the id of the account its screen is showing. */
+export const EXPECTED_USER_HEADER = "x-campushub-user";
+
+/**
+ * Stops a tab that is still showing account A from reading or changing account B's data after
+ * someone signed in as B in another tab of the same browser (the session cookie is shared).
+ * The server only compares the header with the session; it never trusts it as an identity.
+ */
+export function accountGuard(req: Request, _res: Response, next: NextFunction) {
+  const expected = req.get(EXPECTED_USER_HEADER);
+  if (expected && req.user && expected !== req.user.id) {
+    return next(new HttpError(409, "You signed in to a different account in another tab. This page has been refreshed.", "ACCOUNT_CHANGED"));
+  }
   next();
 }
 

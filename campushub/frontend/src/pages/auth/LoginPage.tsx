@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button, ErrorAlert, Field, PasswordInput } from "../../components/ui";
-import { homePathFor, useAuth } from "../../context/AuthContext";
+import { safeReturnPath, useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { AuthLayout } from "../../layouts/AuthLayout";
 import { ApiError, api } from "../../services/api";
@@ -34,8 +34,7 @@ export default function LoginPage() {
     try {
       const user = await login(email.trim(), password, rememberMe);
       toast(`Welcome back, ${user.fullName.split(" ")[0]}!`, "success");
-      const target = user.role === "STUDENT" && user.onboardingCompleted && state.from?.startsWith("/") && !state.from.startsWith("/admin") ? state.from : homePathFor(user);
-      navigate(target, { replace: true });
+      navigate(safeReturnPath(user, state.from), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         setErrors(err.fieldErrors());

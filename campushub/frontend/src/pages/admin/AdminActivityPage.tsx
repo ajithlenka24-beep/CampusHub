@@ -18,6 +18,7 @@ export default function AdminActivityPage() {
           <table className="table">
             <thead><tr><th>When</th><th>Who</th><th>What</th><th>Type</th></tr></thead>
             <tbody>
+              {data?.activity.length === 0 && <tr><td colSpan={4} className="faint">No activity yet.</td></tr>}
               {data?.activity.map((a) => (
                 <tr key={a.id}>
                   <td className="nowrap small">{formatDateTime(a.createdAt)}</td>

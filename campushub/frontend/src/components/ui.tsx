@@ -1,4 +1,5 @@
 import { useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode } from "react";
+import { assetUrl } from "../services/api";
 import type { ApplicationStatus } from "../types";
 import { STATUS_LABELS, initials, matchColor } from "../utils/format";
 import { Icon } from "./Icon";
@@ -63,7 +64,7 @@ export function EmptyState({ icon = "sparkles", title, children }: { icon?: stri
 
 export function Avatar({ name, url, size = "md" }: { name: string; url?: string | null; size?: "sm" | "md" | "lg" }) {
   const [broken, setBroken] = useState(false);
-  if (url && !broken) return <img className={`avatar avatar-${size}`} src={url} alt={`${name}'s profile picture`} onError={() => setBroken(true)} />;
+  if (url && !broken) return <img className={`avatar avatar-${size}`} src={assetUrl(url) ?? undefined} alt={`${name}'s profile picture`} onError={() => setBroken(true)} />;
   return (
     <span className={`avatar avatar-${size}`} aria-label={name} role="img">
       {initials(name)}

@@ -103,8 +103,8 @@ export default function TeamsPage() {
       )}
 
       {data.teams.length === 0 ? (
-        <EmptyState icon="users" title="You're not in a team yet">
-          <p className="muted small">Create a team and CampusHub will suggest teammates whose skills fill your gaps.</p>
+        <EmptyState icon="users" title="You haven't joined a group yet">
+          <p className="muted small">Create a team and invite classmates by email, or accept an invitation when a classmate invites you. CampusHub then analyses your combined skills.</p>
           <Button onClick={() => setCreating(true)}>Create your first team</Button>
         </EmptyState>
       ) : (

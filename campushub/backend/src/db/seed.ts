@@ -89,9 +89,28 @@ const OPPORTUNITIES = [
   { key: "draft", title: "Data Analyst Internship (Draft)", organization: "InsightWorks", type: "INTERNSHIP", workMode: "REMOTE", location: "Remote", deadline: fromNow(40), skills: ["Python", "SQL", "Pandas"], eligibility: "Draft posting.", description: "Draft listing not yet published: analyse business data and build dashboards with Python and SQL.", isPublished: false },
 ] as const;
 
+/**
+ * The seed wipes the database, so it refuses to run once real people have registered
+ * (any account outside the demo @campushub.dev domain), unless you pass --force.
+ */
+export async function assertOnlyDemoAccounts() {
+  if (process.argv.includes("--force") || process.env.SEED_FORCE === "true") return;
+  const exists = await db.execute(sql`select to_regclass('public.users') is not null as present`);
+  if (!(exists.rows[0] as { present?: boolean } | undefined)?.present) return;
+  const result = await db.execute(sql`select count(*)::int as n from users where email not like '%@campushub.dev'`);
+  const real = Number((result.rows[0] as { n?: number } | undefined)?.n ?? 0);
+  if (real > 0) {
+    throw new Error(
+      `This database has ${real} real (non-demo) account(s). Seeding would erase them, so nothing was changed.\n` +
+        "  Use a separate development database, or run with --force if you really want to wipe everything.",
+    );
+  }
+}
+
 async function seed() {
   if (process.env.NODE_ENV === "production") throw new Error("Refusing to seed a production database.");
   await runMigrations();
+  await assertOnlyDemoAccounts();
 
   console.log("Clearing existing data…");
   await db.execute(sql`TRUNCATE users, skills, opportunities, activity_logs RESTART IDENTITY CASCADE`);
@@ -121,6 +140,8 @@ async function seed() {
       bio: s.bio,
       githubUrl: s.github ?? null,
       linkedinUrl: s.linkedin ?? null,
+      // demo students opt in to teammate search so Group Up suggestions have people to show
+      showInDirectory: true,
     });
     const refs = await getOrCreateSkills(db, s.skills.map(([name]) => name));
     await db.insert(studentSkills).values(refs.map((r, i) => ({ userId: u.id, skillId: r.id, proficiency: s.skills[i][1], experienceMonths: s.skills[i][2] })));
@@ -237,7 +258,7 @@ const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === path.r
 if (isDirectRun) {
   seed()
     .catch((error) => {
-      console.error("Seeding failed:", error);
+      console.error("Seeding failed:", error instanceof Error && error.message.includes("real (non-demo)") ? error.message : error);
       process.exitCode = 1;
     })
     .finally(() => pool.end());

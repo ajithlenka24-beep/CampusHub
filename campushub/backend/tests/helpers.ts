@@ -58,19 +58,27 @@ export async function registerAndLogin(email: string, extra: Record<string, unkn
   return client;
 }
 
-export const onboardingPayload = (skills: [string, number][]) => ({
+export const onboardingPayload = (skills: [string, number][], extra: Record<string, unknown> = {}) => ({
   college: "Test University",
   course: "B.Tech CSE",
   department: "Computer Science",
   semester: 3,
   bio: "I am a computer science student who likes building useful software.",
   githubUrl: "github.com/test-student",
+  // opted in to teammate search (the default for new accounts is private)
+  showInDirectory: true,
   skills: skills.map(([name, proficiency]) => ({ name, proficiency, experienceMonths: 6 })),
+  ...extra,
 });
 
-export async function onboardedStudent(email: string, skills: [string, number][] = [["C++", 90], ["DSA", 85], ["Python", 70]], name = "Test Student") {
+export async function onboardedStudent(
+  email: string,
+  skills: [string, number][] = [["C++", 90], ["DSA", 85], ["Python", 70]],
+  name = "Test Student",
+  extra: Record<string, unknown> = {},
+) {
   const client = await registerAndLogin(email, { fullName: name });
-  const res = await client.post("/api/profile/onboarding", onboardingPayload(skills));
+  const res = await client.post("/api/profile/onboarding", onboardingPayload(skills, extra));
   if (res.status !== 200) throw new Error(`onboarding failed: ${JSON.stringify(res.body)}`);
   return client;
 }

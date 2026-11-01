@@ -11,8 +11,8 @@ import { notify, notifyMany } from "../services/notifications.js";
 import { AREA_NAMES } from "../services/skillNormalizer.js";
 import { getOrCreateSkills } from "../services/skills.js";
 import { badRequest, conflict, forbidden, notFound } from "../utils/httpError.js";
-import { optionalText, text, uuidParam } from "../validators/common.js";
-import { loadStudentCards, loadTeam } from "../services/people.js";
+import { email, optionalText, text, uuidParam } from "../validators/common.js";
+import { findInvitee, loadStudentCards, loadTeam } from "../services/people.js";
 
 const MAX_TEAM_SIZE = 10;
 
@@ -33,6 +33,28 @@ async function isMember(teamId: string, userId: string) {
   const [row] = await db.select({ userId: teamMembers.userId }).from(teamMembers).where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
   return Boolean(row);
 }
+
+/**
+ * Locks the team row until the transaction ends, so concurrent invitations, acceptances
+ * and size changes are checked one after another (a team can never exceed its size).
+ */
+async function lockTeam(tx: DbOrTx, teamId: string) {
+  const [team] = await tx.select().from(teams).where(eq(teams.id, teamId)).for("update");
+  return team ?? null;
+}
+
+const isUniqueViolation = (error: unknown) =>
+  (error as { code?: string }).code === "23505" || (error as { cause?: { code?: string } }).cause?.code === "23505";
+
+const inviteSchema = z
+  .object({
+    // a student picked from the teammate suggestions…
+    inviteeId: z.uuid({ error: "Choose a student to invite." }).optional(),
+    // …or anyone with a CampusHub student account, by email
+    email: email.optional(),
+    message: optionalText(300, "Message"),
+  })
+  .refine((d) => Boolean(d.inviteeId) !== Boolean(d.email), { path: ["email"], message: "Enter your teammate's email address (or pick a suggested student)." });
 
 async function setRequiredSkills(dbx: DbOrTx, teamId: string, names: string[]) {
   await dbx.delete(teamRequiredSkills).where(eq(teamRequiredSkills.teamId, teamId));
@@ -122,8 +144,9 @@ export function teamsRouter() {
     const [team] = await db.select().from(teams).where(eq(teams.id, id));
     if (!team || !(await isMember(id, me.id))) throw notFound("Team not found.");
     if (team.ownerId !== me.id) throw forbidden("Only the team owner can edit the team.");
-    if (data.maxSize < (await memberCount(db, id))) throw badRequest("Maximum size cannot be smaller than the current number of members.");
     await db.transaction(async (tx) => {
+      await lockTeam(tx, id);
+      if (data.maxSize < (await memberCount(tx, id))) throw badRequest("Maximum size cannot be smaller than the current number of members.");
       await tx.update(teams).set({ name: data.name, projectTitle: data.projectTitle, description: data.description, maxSize: data.maxSize }).where(eq(teams.id, id));
       await setRequiredSkills(tx, id, data.requiredSkills);
     });
@@ -171,35 +194,45 @@ export function teamsRouter() {
   router.post("/:id/invitations", async (req, res) => {
     const me = currentUser(req);
     const { id } = parse(uuidParam, req.params);
-    const data = parse(z.object({ inviteeId: z.uuid({ error: "Choose a student to invite." }), message: optionalText(300, "Message") }), req.body);
+    const data = parse(inviteSchema, req.body);
     const [team] = await db.select().from(teams).where(eq(teams.id, id));
     if (!team || !(await isMember(id, me.id))) throw notFound("Team not found.");
     if (team.ownerId !== me.id) throw forbidden("Only the team owner can send invitations.");
-    if (data.inviteeId === me.id) throw badRequest("You are already in this team.");
 
-    const [invitee] = await loadStudentCards({ ids: [data.inviteeId] });
-    if (!invitee) throw notFound("That student could not be found.");
-    if (await isMember(id, data.inviteeId)) throw conflict(`${invitee.fullName} is already a member of this team.`, "ALREADY_MEMBER");
-
-    const members = await memberCount(db, id);
-    const [pending] = await db.select({ n: count() }).from(teamInvitations).where(and(eq(teamInvitations.teamId, id), eq(teamInvitations.status, "PENDING")));
-    if (members + Number(pending?.n ?? 0) >= team.maxSize) {
-      throw badRequest(`This team is limited to ${team.maxSize} members (including pending invitations).`);
+    const invitee = await findInvitee(db, data.email ? { email: data.email } : { id: data.inviteeId! });
+    // Ids come from teammate suggestions, so inviting by id only works for students who opted in
+    // to teammate search. Anyone else can still be invited by someone who knows their email.
+    if (!invitee || (!data.email && !invitee.showInDirectory)) {
+      throw notFound(
+        data.email
+          ? "No student with this email has finished setting up CampusHub yet. Ask them to register and complete onboarding, then try again."
+          : "That student could not be found.",
+      );
     }
+    if (invitee.id === me.id) throw badRequest("You are already in this team.");
+    if (await isMember(id, invitee.id)) throw conflict(`${invitee.fullName} is already a member of this team.`, "ALREADY_MEMBER");
 
     try {
-      const [invitation] = await db.insert(teamInvitations).values({ teamId: id, inviterId: me.id, inviteeId: data.inviteeId, message: data.message }).returning();
-      await notify(db, data.inviteeId, {
-        type: "TEAM_INVITE",
-        title: "Team invitation",
-        message: `${me.fullName} invited you to join ${team.name} (${team.projectTitle}).`,
-        link: "/teams",
+      const invitation = await db.transaction(async (tx) => {
+        const locked = await lockTeam(tx, id);
+        if (!locked) throw notFound("Team not found.");
+        const members = await memberCount(tx, id);
+        const [pending] = await tx.select({ n: count() }).from(teamInvitations).where(and(eq(teamInvitations.teamId, id), eq(teamInvitations.status, "PENDING")));
+        if (members + Number(pending?.n ?? 0) >= locked.maxSize) {
+          throw badRequest(`This team is limited to ${locked.maxSize} members (including pending invitations).`);
+        }
+        const [created] = await tx.insert(teamInvitations).values({ teamId: id, inviterId: me.id, inviteeId: invitee.id, message: data.message }).returning();
+        await notify(tx, invitee.id, {
+          type: "TEAM_INVITE",
+          title: "Team invitation",
+          message: `${me.fullName} invited you to join ${locked.name} (${locked.projectTitle}).`,
+          link: "/teams",
+        });
+        return created;
       });
-      res.status(201).json({ invitation });
+      res.status(201).json({ invitation: { id: invitation.id, status: invitation.status, createdAt: invitation.createdAt, inviteeName: invitee.fullName } });
     } catch (error) {
-      if ((error as { code?: string }).code === "23505" || (error as { cause?: { code?: string } }).cause?.code === "23505") {
-        throw conflict(`${invitee.fullName} already has a pending invitation to this team.`, "DUPLICATE_INVITATION");
-      }
+      if (isUniqueViolation(error)) throw conflict(`${invitee.fullName} already has a pending invitation to this team.`, "DUPLICATE_INVITATION");
       throw error;
     }
   });
@@ -253,6 +286,7 @@ export function teamsRouter() {
     if (!team || !(await isMember(id, me.id))) throw notFound("Team not found.");
 
     await db.transaction(async (tx) => {
+      await lockTeam(tx, id);
       await tx.delete(teamMembers).where(and(eq(teamMembers.teamId, id), eq(teamMembers.userId, me.id)));
       const remaining = await tx.select({ userId: teamMembers.userId }).from(teamMembers).where(eq(teamMembers.teamId, id)).orderBy(asc(teamMembers.joinedAt));
       if (!remaining.length) {
@@ -290,19 +324,27 @@ export function invitationsRouter() {
     const me = currentUser(req);
     const { id } = parse(uuidParam, req.params);
     const invitation = await pendingInvitation(id, me.id);
-    const [team] = await db.select().from(teams).where(eq(teams.id, invitation.teamId));
-    if (!team) throw notFound("This team no longer exists.");
 
-    await db.transaction(async (tx) => {
-      if ((await memberCount(tx, team.id)) >= team.maxSize) throw badRequest(`${team.name} is already full (${team.maxSize} members).`);
-      await tx.insert(teamMembers).values({ teamId: team.id, userId: me.id }).onConflictDoNothing();
-      await tx.update(teamInvitations).set({ status: "ACCEPTED", respondedAt: new Date() }).where(eq(teamInvitations.id, id));
+    const team = await db.transaction(async (tx) => {
+      // one acceptance at a time per team, so two people accepting together cannot exceed the size limit
+      const locked = await lockTeam(tx, invitation.teamId);
+      if (!locked) throw notFound("This team no longer exists.");
+      // claim the invitation: only one request can move it out of PENDING
+      const claimed = await tx
+        .update(teamInvitations)
+        .set({ status: "ACCEPTED", respondedAt: new Date() })
+        .where(and(eq(teamInvitations.id, id), eq(teamInvitations.inviteeId, me.id), eq(teamInvitations.status, "PENDING")))
+        .returning({ id: teamInvitations.id });
+      if (!claimed.length) throw notFound("This invitation is no longer available.");
+      if ((await memberCount(tx, locked.id)) >= locked.maxSize) throw badRequest(`${locked.name} is already full (${locked.maxSize} members).`);
+      await tx.insert(teamMembers).values({ teamId: locked.id, userId: me.id }).onConflictDoNothing();
       await notify(tx, invitation.inviterId, {
         type: "TEAM_UPDATE",
         title: "Invitation accepted",
-        message: `${me.fullName} accepted your invitation and joined ${team.name}.`,
-        link: `/teams/${team.id}`,
+        message: `${me.fullName} accepted your invitation and joined ${locked.name}.`,
+        link: `/teams/${locked.id}`,
       });
+      return locked;
     });
     await logActivity(db, { actorId: me.id, action: "TEAM_JOINED", entityType: "team", entityId: team.id });
     res.json({ team: await loadTeam(db, team.id) });
@@ -312,7 +354,12 @@ export function invitationsRouter() {
     const me = currentUser(req);
     const { id } = parse(uuidParam, req.params);
     const invitation = await pendingInvitation(id, me.id);
-    await db.update(teamInvitations).set({ status: "DECLINED", respondedAt: new Date() }).where(eq(teamInvitations.id, id));
+    const declined = await db
+      .update(teamInvitations)
+      .set({ status: "DECLINED", respondedAt: new Date() })
+      .where(and(eq(teamInvitations.id, id), eq(teamInvitations.inviteeId, me.id), eq(teamInvitations.status, "PENDING")))
+      .returning({ id: teamInvitations.id });
+    if (!declined.length) throw notFound("This invitation is no longer available.");
     const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, invitation.teamId));
     await notify(db, invitation.inviterId, { type: "TEAM_UPDATE", title: "Invitation declined", message: `${me.fullName} declined the invitation to ${team?.name ?? "your team"}.`, link: "/teams" });
     res.json({ message: "Invitation declined." });

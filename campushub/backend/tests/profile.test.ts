@@ -15,14 +15,24 @@ describe("onboarding", () => {
     expect(dash.body.error.code).toBe("ONBOARDING_REQUIRED");
   });
 
-  it("requires at least 3 skills and an introduction", async () => {
+  it("requires college, course, semester and at least one skill; everything else is optional", async () => {
     const client = await registerAndLogin("new@test.dev");
-    const res = await client.post("/api/profile/onboarding", onboardingPayload([["C++", 80]]));
-    expect(res.status).toBe(400);
-    const ok = await client.post("/api/profile/onboarding", onboardingPayload([["C++", 80], ["DSA", 70], ["SQL", 60]]));
+    const none = await client.post("/api/profile/onboarding", onboardingPayload([]));
+    expect(none.status).toBe(400);
+    expect(none.body.error.details[0].path).toBe("skills");
+    const noSemester = await client.post("/api/profile/onboarding", onboardingPayload([["C++", 80]], { semester: undefined }));
+    expect(noSemester.status).toBe(400);
+    // no introduction, links or projects needed
+    const ok = await client.post("/api/profile/onboarding", onboardingPayload([["C++", 80]], { bio: "", githubUrl: "" }));
     expect(ok.status).toBe(200);
     expect(ok.body.user.onboardingCompleted).toBe(true);
     expect((await client.get("/api/dashboard")).status).toBe(200);
+  });
+
+  it("rejects the same skill twice, including aliases like JS and JavaScript", async () => {
+    const client = await registerAndLogin("new@test.dev");
+    const res = await client.post("/api/profile/onboarding", onboardingPayload([["JS", 60], ["JavaScript", 70]]));
+    expect(res.status).toBe(400);
   });
 });
 

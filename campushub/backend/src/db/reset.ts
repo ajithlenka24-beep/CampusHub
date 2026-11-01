@@ -2,10 +2,12 @@
 import { sql } from "drizzle-orm";
 import { db, pool } from "./client.js";
 import { runMigrations } from "./migrate.js";
-import { seed } from "./seed.js";
+import { assertOnlyDemoAccounts, seed } from "./seed.js";
 
 async function reset() {
   if (process.env.NODE_ENV === "production") throw new Error("Refusing to reset a production database.");
+  // never silently erase accounts that real people created (override with --force)
+  await assertOnlyDemoAccounts();
   await db.execute(sql`DROP SCHEMA IF EXISTS public CASCADE`);
   await db.execute(sql`DROP SCHEMA IF EXISTS drizzle CASCADE`);
   await db.execute(sql`CREATE SCHEMA public`);
@@ -15,7 +17,7 @@ async function reset() {
 
 reset()
   .catch((error) => {
-    console.error("Reset failed:", error);
+    console.error("Reset failed:", error instanceof Error ? error.message : error);
     process.exitCode = 1;
   })
   .finally(() => pool.end());

@@ -87,18 +87,30 @@ try {
   await page.waitForURL("**/onboarding");
   check("dashboard blocked until onboarding is complete", page.url().endsWith("/onboarding"));
 
-  // 4. Onboarding (3 steps)
+  // 4. Onboarding (6 steps: basics and skills required, the rest optional)
+  check("onboarding starts with basic information prefilled from registration", (await page.inputValue("#college")) === "CampusHub University");
   await page.fill("#department", "Computer Science");
-  await page.click("text=Continue");
   await page.fill("#bio", "Second-year CSE student who loves C++, algorithms and building useful web apps.");
-  await page.fill("#github", "github.com/lucky-dev");
-  await page.click("text=Continue");
+  await page.click("button:has-text('Save & continue')");
+  await page.waitForSelector("#skill-input");
+  await page.click("button:has-text('Save & continue')");
+  check("skills step requires at least one skill", (await page.locator(".field-error", { hasText: "at least one skill" }).count()) === 1);
   for (const s of ["C++", "DSA", "OOP"]) {
     await page.fill("#skill-input", s);
     await page.keyboard.press("Enter");
   }
   await page.waitForTimeout(300);
   await shot("03-onboarding");
+  await page.click("button:has-text('Save & continue')");
+  await page.waitForSelector("text=No projects yet");
+  await page.click("button:has-text('Skip for now')"); // projects (optional)
+  await page.waitForSelector("text=Add an achievement");
+  await page.click("button:has-text('Skip for now')"); // achievements & certifications (optional)
+  await page.waitForSelector("#github");
+  await page.fill("#github", "github.com/lucky-dev");
+  await page.click("button:has-text('Save & continue')"); // social links (optional)
+  await page.waitForSelector("text=Show me in Group Up teammate search");
+  await shot("03b-onboarding-finish");
   await page.click("text=Finish & go to dashboard");
   await page.waitForURL("**/dashboard");
   await page.waitForSelector(".stats-grid");

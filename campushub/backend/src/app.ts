@@ -6,11 +6,11 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
 import { env } from "./config/env.js";
-import { loadUser } from "./middleware/auth.js";
+import { accountGuard, loadUser } from "./middleware/auth.js";
 import { csrfProtection } from "./middleware/csrf.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.js";
 import { createRateLimiters } from "./middleware/rateLimit.js";
-import { uploadRoot } from "./middleware/upload.js";
+import { uploadAccess, uploadRoot } from "./middleware/upload.js";
 import { adminRouter } from "./routes/admin.routes.js";
 import { assistantRouter } from "./routes/assistant.routes.js";
 import { authRouter } from "./routes/auth.routes.js";
@@ -52,13 +52,20 @@ export function createApp(options: { rateLimit?: boolean } = {}) {
     });
   }
 
-  // uploaded images (filenames are random UUIDs; only images are ever written here)
-  app.use("/uploads", express.static(uploadRoot, { maxAge: "7d", dotfiles: "deny", index: false }));
+  // uploaded images (random UUID names; only images are ever written here), for signed-in users only
+  app.use("/uploads", loadUser, uploadAccess, express.static(uploadRoot, { cacheControl: false, dotfiles: "deny", index: false }));
+  app.use("/uploads", (_req, res) => res.status(404).end());
 
   app.get("/api/health", (_req, res) => res.json({ status: "ok", ai: aiStatus().mode }));
 
-  app.use("/api", limiters.general, loadUser, csrfProtection);
-  app.use("/api/auth", authRouter(limiters.auth));
+  // API responses contain personal data: never let browsers or proxies cache them
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+  // session first, so rate limits are per user (not per shared campus IP) once someone is logged in
+  app.use("/api", loadUser, limiters.general, accountGuard, csrfProtection);
+  app.use("/api/auth", authRouter(limiters));
   app.use("/api/profile", profileRouter());
   app.use("/api/dashboard", dashboardRouter());
   app.use("/api/opportunities", opportunitiesRouter());

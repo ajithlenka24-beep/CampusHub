@@ -11,10 +11,12 @@
     "test": "dotenv -e ../.env.test -- vitest run",
     "db:generate": "dotenv -e ../.env -- drizzle-kit generate",
     "db:migrate": "tsx --env-file=../.env src/db/migrate.ts",
+    "db:migrate:prod": "node --env-file-if-exists=../.env dist/db/migrate.js",
     "db:seed": "tsx --env-file=../.env src/db/seed.ts",
     "db:reset": "tsx --env-file=../.env src/db/reset.ts",
     "db:studio": "dotenv -e ../.env -- drizzle-kit studio",
-    "create-admin": "tsx --env-file=../.env src/scripts/createAdmin.ts"
+    "create-admin": "tsx --env-file=../.env src/scripts/createAdmin.ts",
+    "create-admin:prod": "node --env-file-if-exists=../.env dist/scripts/createAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
